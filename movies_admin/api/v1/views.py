@@ -1,18 +1,24 @@
 from django.contrib.postgres.aggregates import ArrayAgg
-from django.core import paginator
-from django.core.paginator import PageNotAnInteger, Paginator
 from django.db.models import Q
 from django.http import JsonResponse
 from django.views.generic.detail import BaseDetailView
 from django.views.generic.list import BaseListView
-from movies.models import FilmWork
+from movies.models import FilmWork, PersonRole
 
 
 class MoviesApiMixin:
     model = FilmWork
     http_method_names = ["get"]
 
-    def get_queryset(self):
+    def _aggregate_person(role):
+        return ArrayAgg(
+            "persons__full_name",
+            filter=Q(personfilmwork__role=role),
+            distinct=True,
+        )
+
+    @classmethod
+    def get_queryset(cls):
         """Метод возвращающий подготовленный QuerySet."""
 
         fields = [
@@ -25,31 +31,17 @@ class MoviesApiMixin:
         ]
 
         return (
-            FilmWork.objects.order_by("title")
+            FilmWork.objects.select_related("genres", "persons")
             .values(*fields)
             .annotate(
-                genres=ArrayAgg(
-                    "genres__name",
-                    distinct=True,
-                ),
-                actors=ArrayAgg(
-                    "persons__full_name",
-                    filter=Q(personfilmwork__role="actor"),
-                    distinct=True,
-                ),
-                directors=ArrayAgg(
-                    "persons__full_name",
-                    filter=Q(personfilmwork__role="writer"),
-                    distinct=True,
-                ),
-                writers=ArrayAgg(
-                    "persons__full_name",
-                    filter=Q(personfilmwork__role="director"),
-                    distinct=True,
-                ),
+                genres=ArrayAgg("genres__name", distinct=True),
+                actors=cls._aggregate_person(role=PersonRole.ACTOR),
+                directors=cls._aggregate_person(role=PersonRole.DIRECTOR),
+                writers=cls._aggregate_person(role=PersonRole.WRITER),
             )
         )
 
+    @classmethod
     def render_to_response(self, context, **response_kwargs):
         """Метод, отвечающий за форматирование данных,
         которые вернутся при GET-запросе.
@@ -58,7 +50,7 @@ class MoviesApiMixin:
         return JsonResponse(context)
 
 
-class Movies(MoviesApiMixin, BaseListView):
+class MoviesListApi(MoviesApiMixin, BaseListView):
     paginate_by = 50
 
     def get_context_data(self, *, object_list=None, **kwargs):
@@ -81,8 +73,7 @@ class Movies(MoviesApiMixin, BaseListView):
 
 
 class MoviesDetailApi(MoviesApiMixin, BaseDetailView):
-    def get_context_data(self, *, object_list=None, **kwargs):
+    def get_context_data(self, **kwargs):
         """Метод, возвращающий словарь с данными для формирования страницы."""
 
-        context_data = super().get_context_data(kwargs={"pk": self.get_object()["id"]})
-        return context_data["object"]
+        return kwargs["object"]

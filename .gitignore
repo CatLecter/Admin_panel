@@ -54,4 +54,7 @@ doc.html
 *.webp
 *.jpg
 *.jpeg
-db/
+*.sqlite
+*.sqlite3
+static/
+film_works/

@@ -1,14 +1,3 @@
-version: '3.8'
-
-networks:
-  backend:
-    name: backend
-    driver: bridge
-
-volumes:
-  db:
-  film_works:
-
 services:
   postgres:
     image: postgres:13.5-bullseye
@@ -21,7 +10,7 @@ services:
       - POSTGRES_DB=${DB_NAME}
       - POSTGRES_PASSWORD=${DB_PASSWORD}
     volumes:
-      - ./db:/var/lib/postgresql/data
+      - db:/var/lib/postgresql/data
 
   admin_panel:
     build: ./movies_admin/
@@ -38,11 +27,6 @@ services:
       - ./movies_admin/film_works/:/usr/src/movies_admin/film_works
     networks:
       - backend
-    command: gunicorn --bind 0.0.0.0:8000 config.wsgi --reload
-#      bash - c "python manage.py collectstatic --no-input &&
-#      gunicorn --bind 0.0.0.0:8000 config.wsgi --reload"
-    ports:
-      - 8000:8000
     depends_on:
       - postgres
 
@@ -53,7 +37,6 @@ services:
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf
       - ./nginx/conf.d:/etc/nginx/conf.d
-      - ./movies_admin/film_works/:/usr/src/movies_admin/film_works
       - ./movies_admin/static/:/static
     networks:
       - backend
@@ -62,3 +45,12 @@ services:
     depends_on:
       - admin_panel
       - postgres
+
+volumes:
+  db:
+  film_works:
+
+networks:
+  backend:
+    name: backend
+    driver: bridge
